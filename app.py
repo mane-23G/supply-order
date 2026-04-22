@@ -1,25 +1,89 @@
-import sys
+# Source - https://stackoverflow.com/a/56868476
+# Posted by eyllanesc
+# Retrieved 2026-04-21, License - CC BY-SA 4.0
 
-from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtWidgets import QApplication, QPushButton, QMainWindow
+from PyQt5 import QtCore, QtGui, QtWidgets
 
-#Subclass QMainWindow to customize your apps main window
-class MainWindow(QMainWindow):
+
+class PageWindow(QtWidgets.QMainWindow):
+    gotoSignal = QtCore.pyqtSignal(str)
+
+    def goto(self, name):
+        self.gotoSignal.emit(name)
+
+
+class MainWindow(PageWindow):
     def __init__(self):
         super().__init__()
+        self.initUI()
+        self.setWindowTitle("MainWindow")
 
-        self.setWindowTitle("My App")
-        buton = QPushButton("Press Me!")
+    def initUI(self):
+        self.UiComponents()
 
-        self.setFixedSize(QSize(400,300))
+    def UiComponents(self):
+        self.searchButton = QtWidgets.QPushButton("", self)
+        self.searchButton.clicked.connect(
+            self.make_handleButton("searchButton")
+        )
 
-        #Set the central widget of the window
-        self.setCentralWidget(buton)
+    def make_handleButton(self, button):
+        def handleButton():
+            if button == "searchButton":
+                self.goto("search")
+        return handleButton
 
-app = QApplication(sys.argv)
 
-window = MainWindow()
-window.show()
+class SearchWindow(PageWindow):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
 
-app.exec()
+    def initUI(self):
+        self.setWindowTitle("Search for something")
+        self.UiComponents()
 
+    def goToMain(self):
+        self.goto("main")
+
+    def UiComponents(self):
+        self.backButton = QtWidgets.QPushButton("BackButton", self)
+        self.backButton.setGeometry(QtCore.QRect(5, 5, 100, 20))
+        self.backButton.clicked.connect(self.goToMain)
+
+
+class Window(QtWidgets.QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.stacked_widget = QtWidgets.QStackedWidget()
+        self.setCentralWidget(self.stacked_widget)
+
+        self.m_pages = {}
+
+        self.register(MainWindow(), "main")
+        self.register(SearchWindow(), "search")
+
+        self.goto("main")
+
+    def register(self, widget, name):
+        self.m_pages[name] = widget
+        self.stacked_widget.addWidget(widget)
+        if isinstance(widget, PageWindow):
+            widget.gotoSignal.connect(self.goto)
+
+    @QtCore.pyqtSlot(str)
+    def goto(self, name):
+        if name in self.m_pages:
+            widget = self.m_pages[name]
+            self.stacked_widget.setCurrentWidget(widget)
+            self.setWindowTitle(widget.windowTitle())
+
+
+if __name__ == "__main__":
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    w = Window()
+    w.show()
+    sys.exit(app.exec_())
